@@ -1,0 +1,79 @@
+/* Custom CSS Variables & Global Theme Tweaks */
+:root {
+    --primary-gradient: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+    --shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+}
+
+/* Ensure footer stays pinned to the bottom of the screen */
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background-color: #f8fafc !important;
+}
+
+.container.min-vh-100 {
+    flex: 1 0 auto;
+}
+
+footer {
+    flex-shrink: 0;
+}
+
+/* Modernized Card Layout Styles */
+.card {
+    border: none !important;
+    border-radius: 12px !important;
+    box-shadow: var(--shadow-soft);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+}
+
+.card-img-top {
+    border-top-left-radius: 12px !important;
+    border-top-right-radius: 12px !important;
+}
+
+/* Custom Uniform Badges */
+.badge {
+    padding: 6px 12px !important;
+    font-weight: 600 !important;
+    border-radius: 20px !important;
+    letter-spacing: 0.3px;
+}
+
+/* Custom Buttons Enhancement */
+.btn {
+    border-radius: 8px !important;
+    padding: 8px 16px;
+    font-weight: 500;
+}
+
+/* Dashboard Custom Adjustments */
+.list-group-item {
+    border-left: 4px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.list-group-item:hover {
+    background-color: #f1f5f9;
+    border-left-color: #3b82f6;
+}
+
+/* Dashboard Small Button Styling */
+.btn-xs {
+    padding: 2px 6px !important;
+    font-size: 0.8rem !important;
+    border-radius: 4px !important;
+}
+
+/* Utility classes for responsive image wrappers */
+.bg-secondary {
+    background-color: #cbd5e1 !important;
+    color: #475569 !important;
+}

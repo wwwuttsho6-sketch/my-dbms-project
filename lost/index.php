@@ -30,28 +30,36 @@ $stmt->execute($params);
 $items = $stmt->fetchAll();
 ?>
 
-<div class="row mb-4 align-items-center">
-    <div class="col-md-6">
-        <h2 class="text-danger">🔴 Lost Items Feed</h2>
-        <p class="text-muted">Browse items reported lost on campus or post a new one.</p>
+<div class="row mb-4 align-items-center gy-3">
+    <div class="col-md-7">
+        <h2 class="font-heading mb-1 text-white"><span class="text-danger">🔴</span> Campus Lost Items Feed</h2>
+        <p class="text-muted mb-0">Explore items missing on university grounds or post a missing report.</p>
     </div>
-    <div class="col-md-6 text-md-end">
+    <div class="col-md-5 text-md-end">
         <?php if(isset($_SESSION['user_id'])): ?>
-            <a href="create.php" class="btn btn-danger">+ Report a Lost Item</a>
+            <a href="create.php" class="btn btn-danger-custom px-4 py-2">
+                <i class="bi bi-plus-circle me-1"></i> Report a Lost Item
+            </a>
         <?php else: ?>
-            <a href="../auth/login.php" class="btn btn-secondary">Login to Report Item</a>
+            <a href="../auth/login.php" class="btn btn-brand px-4 py-2">
+                <i class="bi bi-box-arrow-in-right me-1"></i> Login to Report Item
+            </a>
         <?php endif; ?>
     </div>
 </div>
 
-<div class="card shadow-sm p-3 mb-4">
+<!-- Search & Interactive Filter Bar -->
+<div class="card card-custom p-3 mb-4">
     <form action="index.php" method="GET" class="row g-2">
         <div class="col-md-6">
-            <input type="text" name="search" value="<?php echo htmlspecialchars($search); ?>" class="form-control" placeholder="Search by title, keywords, or location...">
+            <div class="input-group">
+                <span class="input-group-text bg-dark text-muted border-secondary border-opacity-25"><i class="bi bi-search"></i></span>
+                <input type="text" name="search" id="itemSearchInput" value="<?php echo htmlspecialchars($search); ?>" class="form-control" placeholder="Type keywords, item title, or location...">
+            </div>
         </div>
         <div class="col-md-4">
             <select name="category" class="form-select">
-                <option value="">All Categories</option>
+                <option value="">All Item Categories</option>
                 <option value="Mobile Phones" <?php echo $category == 'Mobile Phones' ? 'selected' : ''; ?>>Mobile Phones</option>
                 <option value="Wallets" <?php echo $category == 'Wallets' ? 'selected' : ''; ?>>Wallets</option>
                 <option value="Laptops" <?php echo $category == 'Laptops' ? 'selected' : ''; ?>>Laptops</option>
@@ -60,43 +68,79 @@ $items = $stmt->fetchAll();
             </select>
         </div>
         <div class="col-md-2">
-            <button type="submit" class="btn btn-primary w-100">Filter</button>
+            <button type="submit" class="btn btn-brand w-100"><i class="bi bi-funnel me-1"></i> Filter</button>
         </div>
     </form>
+
+    <!-- Quick Category Filter Pills -->
+    <div class="nav nav-pills nav-pills-custom mt-3 pt-3 border-top border-secondary border-opacity-25">
+        <a href="index.php" class="nav-link category-filter <?php echo empty($category) ? 'active' : ''; ?>" data-category="all">All Items</a>
+        <a href="index.php?category=Mobile Phones" class="nav-link category-filter <?php echo $category == 'Mobile Phones' ? 'active' : ''; ?>" data-category="Mobile Phones">Mobile Phones</a>
+        <a href="index.php?category=Wallets" class="nav-link category-filter <?php echo $category == 'Wallets' ? 'active' : ''; ?>" data-category="Wallets">Wallets</a>
+        <a href="index.php?category=Laptops" class="nav-link category-filter <?php echo $category == 'Laptops' ? 'active' : ''; ?>" data-category="Laptops">Laptops</a>
+        <a href="index.php?category=ID Cards" class="nav-link category-filter <?php echo $category == 'ID Cards' ? 'active' : ''; ?>" data-category="ID Cards">ID Cards</a>
+        <a href="index.php?category=Other Items" class="nav-link category-filter <?php echo $category == 'Other Items' ? 'active' : ''; ?>" data-category="Other Items">Other Items</a>
+    </div>
 </div>
 
-<div class="row">
+<!-- Item Grid -->
+<div class="row g-4" id="itemsGrid">
     <?php if(count($items) > 0): ?>
         <?php foreach($items as $item): ?>
-            <div class="col-md-4 mb-4">
-                <div class="card h-100 shadow-sm">
-                    <?php if(!empty($item['image_path'])): ?>
-                        <img src="../uploads/lost_items/<?php echo htmlspecialchars($item['image_path']); ?>" class="card-img-top" style="height: 200px; object-fit: cover;" alt="Item Image">
-                    <?php else: ?>
-                        <div class="bg-secondary text-white d-flex align-items-center justify-content-center" style="height: 200px;">
-                            <span>No Image Provided</span>
-                        </div>
-                    <?php endif; ?>
+            <?php 
+                $img = $item['image_path'];
+                if(!empty($img) && strpos($img, 'http') === false && strpos($img, 'uploads/') !== 0) {
+                    $img = 'uploads/lost_items/' . $img;
+                }
+            ?>
+            <div class="col-md-4 item-card-col" 
+                 data-title="<?php echo htmlspecialchars($item['title']); ?>"
+                 data-location="<?php echo htmlspecialchars($item['location']); ?>"
+                 data-category="<?php echo htmlspecialchars($item['category']); ?>">
+                
+                <div class="card card-custom h-100">
+                    <div class="item-img-wrapper">
+                        <?php if(!empty($img)): ?>
+                            <img src="<?php echo $base_url . $img; ?>" class="previewable-image" alt="<?php echo htmlspecialchars($item['title']); ?>">
+                        <?php else: ?>
+                            <div class="no-image-placeholder">
+                                <i class="bi bi-image fs-1 opacity-50"></i>
+                                <span class="small mt-1">No Image Attached</span>
+                            </div>
+                        <?php endif; ?>
+                        <span class="badge badge-custom badge-lost position-absolute top-0 start-0 m-3">
+                            <i class="bi bi-exclamation-circle me-1"></i> Lost
+                        </span>
+                    </div>
+                    
                     <div class="card-body d-flex flex-column">
-                        <span class="badge bg-danger mb-2 align-self-start"><?php echo htmlspecialchars($item['category']); ?></span>
-                        <h5 class="card-title fw-bold"><?php echo htmlspecialchars($item['title']); ?></h5>
-                        <p class="card-text text-muted flex-grow-1">
-                            <?php echo htmlspecialchars(substr($item['description'], 0, 100)) . (strlen($item['description']) > 100 ? '...' : ''); ?>
-                        </p>
-                        <div class="text-xs text-muted mb-2">
-                            📍 <strong>Location:</strong> <?php echo htmlspecialchars($item['location']); ?><br>
-                            📅 <strong>Date Lost:</strong> <?php echo htmlspecialchars($item['lost_date']); ?>
+                        <div class="mb-2">
+                            <span class="badge badge-category"><?php echo htmlspecialchars($item['category']); ?></span>
+                            <span class="small text-muted float-end"><i class="bi bi-calendar3 me-1"></i><?php echo date('M d, Y', strtotime($item['lost_date'])); ?></span>
                         </div>
-                        <a href="detail.php?id=<?php echo $item['id']; ?>" class="btn btn-outline-danger w-100 mt-2">View Details</a>
+
+                        <h5 class="card-title font-heading text-white"><?php echo htmlspecialchars($item['title']); ?></h5>
+                        <p class="card-text text-muted small flex-grow-1">
+                            <?php echo htmlspecialchars(substr($item['description'], 0, 110)) . (strlen($item['description']) > 110 ? '...' : ''); ?>
+                        </p>
+
+                        <div class="pt-3 border-top border-secondary border-opacity-25 d-flex justify-content-between align-items-center">
+                            <span class="small text-muted"><i class="bi bi-geo-alt me-1 text-danger"></i><?php echo htmlspecialchars($item['location']); ?></span>
+                            <a href="detail.php?id=<?php echo $item['id']; ?>" class="btn btn-brand btn-sm">
+                                View Details &rarr;
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
         <?php endforeach; ?>
-    <?php else: ?>
-        <div class="col-12 text-center py-5">
-            <h5 class="text-muted">No lost items found matching your criteria.</h5>
-        </div>
     <?php endif; ?>
+
+    <div class="col-12 text-center py-5" id="noItemsNotice" style="<?php echo count($items) === 0 ? 'display: block;' : 'display: none;'; ?>">
+        <i class="bi bi-search fs-1 text-muted d-block mb-3"></i>
+        <h5 class="text-muted font-heading">No lost items found matching your criteria.</h5>
+        <p class="small text-muted">Try clearing search filters or report a new lost item.</p>
+    </div>
 </div>
 
 <?php require_once '../includes/footer.php'; ?>

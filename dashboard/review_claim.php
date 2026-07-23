@@ -10,7 +10,7 @@ if (!isset($_SESSION['user_id'])) {
 $claim_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 $user_id = $_SESSION['user_id'];
 
-// Fetch claim details, claimant details, and verify if the logged-in user is the actual creator of the item post
+// Fetch claim details, claimant details, and verify if logged-in user is item owner
 $stmt = $pdo->prepare("
     SELECT c.*, u.name as claimant_name, u.email as claimant_email, u.phone as claimant_phone, u.department as claimant_dept, u.university_id as claimant_uni_id,
            COALESCE(l.title, f.title) as item_title,
@@ -25,28 +25,23 @@ $stmt = $pdo->prepare("
 $stmt->execute([$claim_id]);
 $claim = $stmt->fetch();
 
-// Security Boundary: Ensure claim exists and belongs to an item posted by the current session user
+// Security check
 if (!$claim || $claim['post_owner_id'] != $user_id) {
-    echo "<div class='alert alert-danger my-5 text-center'><h4>Unauthorized access or invalid record identifier.</h4></div>";
+    echo "<div class='alert alert-danger my-5 text-center bg-danger text-white border-0 rounded-3'><h4>Unauthorized access or invalid claim record.</h4></div>";
     require_once '../includes/footer.php';
     exit;
 }
 
-// Convert serialized JSON data back into a readable PHP array
 $verification_fields = json_decode($claim['verification_data'], true);
-
 $message = '';
 
-// Process Actions (Approve / Reject)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
     
     if ($action === 'approve') {
-        // Update claim status to Approved
         $update_claim = $pdo->prepare("UPDATE claims SET status = 'Approved' WHERE id = ?");
         $update_claim->execute([$claim_id]);
 
-        // Toggle the underlying item listing status to close it out
         if ($claim['item_type'] === 'lost') {
             $update_item = $pdo->prepare("UPDATE lost_items SET status = 'Recovered' WHERE id = ?");
         } else {
@@ -54,25 +49,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         $update_item->execute([$claim['item_id']]);
 
-        // Push confirmation alert back to the Claimant's dashboard profile
-        $notif_msg = "Great news! Your verification request for '" . $claim['item_title'] . "' was APPROVED. Please contact the post creator.";
+        $notif_msg = "Great news! Your verification request for '" . $claim['item_title'] . "' was APPROVED. Please contact the post owner.";
         $notif_stmt = $pdo->prepare("INSERT INTO notifications (user_id, message) VALUES (?, ?)");
         $notif_stmt->execute([$claim['claimant_id'], $notif_msg]);
 
-        $message = "<div class='alert alert-success'>Claim successfully approved! An alert notification has been sent to the student.</div>";
-        $claim['status'] = 'Approved'; // Update local variable for rendering update state
+        $message = "<div class='alert alert-success bg-success text-white border-0 rounded-3 mb-4'><i class='bi bi-check-circle-fill me-2'></i>Claim approved! Notification sent to claimant.</div>";
+        $claim['status'] = 'Approved';
         
     } else if ($action === 'reject') {
-        // Update claim status to Rejected
         $update_claim = $pdo->prepare("UPDATE claims SET status = 'Rejected' WHERE id = ?");
         $update_claim->execute([$claim_id]);
 
-        // Notify the claimant about the manual rejection status update
-        $notif_msg = "The verification details you submitted for '" . $claim['item_title'] . "' did not match the physical asset specifications and was rejected.";
+        $notif_msg = "Verification details for '" . $claim['item_title'] . "' did not match item specifications and was rejected.";
         $notif_stmt = $pdo->prepare("INSERT INTO notifications (user_id, message) VALUES (?, ?)");
         $notif_stmt->execute([$claim['claimant_id'], $notif_msg]);
 
-        $message = "<div class='alert alert-warning'>Claim form application has been marked as rejected.</div>";
+        $message = "<div class='alert alert-warning bg-warning text-dark border-0 rounded-3 mb-4'><i class='bi bi-exclamation-triangle-fill me-2'></i>Claim rejected. Notification sent to claimant.</div>";
         $claim['status'] = 'Rejected';
     }
 }
@@ -82,63 +74,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     <div class="col-md-8">
         <?php echo $message; ?>
         
-        <div class="card shadow border-0">
-            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Reviewing Verification Data Submission</h5>
-                <span class="badge bg-info text-dark"><?php echo $claim['status']; ?></span>
-            </div>
-            
-            <div class="card-body p-4">
+        <div class="card card-custom shadow-lg">
+            <div class="card-body p-4 p-md-5">
+                <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom border-secondary border-opacity-25">
+                    <div>
+                        <h4 class="font-heading text-white mb-1">Review Claim Submission</h4>
+                        <p class="text-muted small mb-0">Item: <strong class="text-info"><?php echo htmlspecialchars($claim['item_title']); ?></strong></p>
+                    </div>
+                    <?php if($claim['status'] === 'Approved'): ?>
+                        <span class="badge badge-found py-2 px-3">APPROVED</span>
+                    <?php elseif($claim['status'] === 'Rejected'): ?>
+                        <span class="badge badge-lost py-2 px-3">REJECTED</span>
+                    <?php else: ?>
+                        <span class="badge bg-warning text-dark py-2 px-3">PENDING</span>
+                    <?php endif; ?>
+                </div>
+                
                 <!-- Section 1: Claimant Profile -->
-                <h5 class="text-primary border-bottom pb-2 mb-3">👤 Claimant Account Identity</h5>
-                <div class="row bg-light p-3 rounded mb-4 text-sm">
-                    <div class="col-md-6 mb-2"><strong>Full Name:</strong> <?php echo htmlspecialchars($claim['claimant_name']); ?></div>
-                    <div class="col-md-6 mb-2"><strong>Campus ID:</strong> <?php echo htmlspecialchars($claim['claimant_uni_id']); ?></div>
-                    <div class="col-md-6 mb-2"><strong>Department:</strong> <?php echo htmlspecialchars($claim['claimant_dept']); ?></div>
-                    <div class="col-md-6 mb-2"><strong>Contact Number:</strong> <?php echo htmlspecialchars($claim['claimant_phone']); ?></div>
-                    <div class="col-md-12"><strong>Email Address:</strong> <?php echo htmlspecialchars($claim['claimant_email']); ?></div>
+                <h5 class="font-heading text-primary mb-3"><i class="bi bi-person-circle me-2"></i> Claimant Account Information</h5>
+                <div class="row bg-dark p-3 rounded-3 mb-4 border border-secondary border-opacity-25 g-2">
+                    <div class="col-md-6"><strong class="text-muted">Full Name:</strong> <span class="text-white"><?php echo htmlspecialchars($claim['claimant_name']); ?></span></div>
+                    <div class="col-md-6"><strong class="text-muted">Campus ID:</strong> <span class="text-white"><?php echo htmlspecialchars($claim['claimant_uni_id']); ?></span></div>
+                    <div class="col-md-6"><strong class="text-muted">Department:</strong> <span class="text-white"><?php echo htmlspecialchars($claim['claimant_dept']); ?></span></div>
+                    <div class="col-md-6"><strong class="text-muted">Contact Phone:</strong> <span class="text-info"><?php echo htmlspecialchars($claim['claimant_phone']); ?></span></div>
+                    <div class="col-md-12"><strong class="text-muted">Campus Email:</strong> <span class="text-white"><?php echo htmlspecialchars($claim['claimant_email']); ?></span></div>
                 </div>
 
-                <!-- Section 2: Form Submissions Data Details -->
-                <h5 class="text-primary border-bottom pb-2 mb-3">📝 Provided Physical Item Characteristics</h5>
-                <table class="table table-bordered mb-4">
-                    <thead class="table-secondary text-xs">
-                        <tr>
-                            <th style="width: 40%;">Verification Criteria Field</th>
-                            <th>Claimant Input Value Response</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if(is_array($verification_fields)): ?>
-                            <?php foreach($verification_fields as $field_label => $user_value): ?>
-                                <tr>
-                                    <td class="fw-bold bg-light"><?php echo htmlspecialchars($field_label); ?></td>
-                                    <td><?php echo htmlspecialchars($user_value); ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr><td colspan="2" class="text-center text-muted">Error parsing form entries structure.</td></tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                <!-- Section 2: Form Submissions Details -->
+                <h5 class="font-heading text-primary mb-3"><i class="bi bi-card-checklist me-2"></i> Provided Item Criteria Responses</h5>
+                <div class="table-responsive mb-4">
+                    <table class="table table-custom mb-0">
+                        <thead>
+                            <tr>
+                                <th>Verification Question Field</th>
+                                <th>Claimant Input Response</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if(is_array($verification_fields)): ?>
+                                <?php foreach($verification_fields as $field_label => $user_value): ?>
+                                    <tr>
+                                        <td class="fw-semibold text-info"><?php echo htmlspecialchars($field_label); ?></td>
+                                        <td class="text-white"><?php echo htmlspecialchars(is_array($user_value) ? implode(', ', $user_value) : $user_value); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr><td colspan="2" class="text-center text-muted py-3">Error reading form data.</td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
 
                 <!-- Actions Controls Wrapper -->
-                <div class="pt-3 border-top d-flex justify-content-between">
-                    <a href="index.php" class="btn btn-secondary">Back to Dashboard</a>
+                <div class="pt-3 border-top border-secondary border-opacity-25 d-flex justify-content-between align-items-center">
+                    <a href="index.php" class="btn btn-secondary-custom">&larr; Back to Dashboard</a>
                     
                     <?php if($claim['status'] === 'Pending'): ?>
-                        <div>
-                            <form action="" method="POST" class="d-inline">
+                        <div class="d-flex gap-2">
+                            <form action="" method="POST">
                                 <input type="hidden" name="action" value="reject">
-                                <button type="submit" onclick="return confirm('Reject this verification form request?')" class="btn btn-danger me-2 px-3">❌ Decline Request</button>
+                                <button type="submit" onclick="return confirm('Decline this verification claim?')" class="btn btn-danger-custom">
+                                    <i class="bi bi-x-lg me-1"></i> Reject Claim
+                                </button>
                             </form>
-                            <form action="" method="POST" class="d-inline">
+                            <form action="" method="POST">
                                 <input type="hidden" name="action" value="approve">
-                                <button type="submit" onclick="return confirm('Are you sure the parameters match perfectly? This will approve ownership rights and close out this post listing.')" class="btn btn-success px-4">✓ Approve & Match</button>
+                                <button type="submit" onclick="return confirm('Approve ownership claim? Item will be marked as recovered.')" class="btn btn-success-custom">
+                                    <i class="bi bi-check-lg me-1"></i> Approve Claim
+                                </button>
                             </form>
                         </div>
                     <?php else: ?>
-                        <button class="btn btn-light" disabled>Workflow Concluded</button>
+                        <span class="badge badge-category py-2 px-3">Workflow Completed</span>
                     <?php endif; ?>
                 </div>
 

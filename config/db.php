@@ -18,8 +18,28 @@ $options = [
 ];
 
 try {
-     $pdo = new PDO($dsn, $user, $pass, $options);
+    $pdo = new PDO($dsn, $user, $pass, $options);
+
+    // Auto-migrate role column if not exists in users table
+    try {
+        $checkCol = $pdo->query("SHOW COLUMNS FROM users LIKE 'role'")->fetch();
+        if (!$checkCol) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN role ENUM('user', 'admin') DEFAULT 'user'");
+        }
+
+        // Seed initial admin user if none exists
+        $adminCheck = $pdo->query("SELECT id FROM users WHERE role = 'admin' LIMIT 1")->fetch();
+        if (!$adminCheck) {
+            $adminEmail = 'admin@university.edu';
+            $adminPass = password_hash('admin123', PASSWORD_BCRYPT);
+            $stmt = $pdo->prepare("INSERT INTO users (name, email, phone, department, university_id, password, role) VALUES (?, ?, ?, ?, ?, ?, 'admin') ON DUPLICATE KEY UPDATE role = 'admin'");
+            $stmt->execute(['System Admin', $adminEmail, '0000000000', 'Administration', 'ADMIN001', $adminPass]);
+        }
+    } catch (\PDOException $ex) {
+        // Table might not exist yet if database script hasn't run
+    }
+
 } catch (\PDOException $e) {
-     throw new \PDOException($e->getMessage(), (int)$e->getCode());
+    throw new \PDOException($e->getMessage(), (int)$e->getCode());
 }
 ?>
